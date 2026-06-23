@@ -1,6 +1,6 @@
-# Project Config Template
+# Linear Workflow Config Template
 
-Create this folder in each repository that uses `linear-workflow`:
+Create this folder in each repository, product workspace, shared skill repo, or workstream that uses `linear-workflow`:
 
 ```text
 .linear-workflow/
@@ -14,19 +14,38 @@ Create this folder in each repository that uses `linear-workflow`:
 {
   "team": "Example Team",
   "project": "Example Project",
-  "projectScope": {
-    "description": "Short description of the product/repository this Linear project tracks.",
+  "workScope": {
+    "description": "Short description of the product, repository, workspace, or workstream this Linear config tracks.",
     "inScope": [
-      "Features, fixes, refactors, migrations, and plans for this product/repository"
+      "Features, fixes, refactors, migrations, and plans for this configured work scope"
     ],
     "outOfScope": [
-      "Shared agent skills, unrelated tooling, or work for a different repository/product"
+      "Shared agent skills, unrelated tooling, or work for a different repository/product/workstream"
     ]
   },
   "trackingPolicy": {
-    "projectRelevance": "required",
+    "scopeRelevance": "required",
+    "minimumTaskSize": "standalone-change-or-plan",
     "onUnrelatedTask": "skip-linear-and-tell-user",
+    "onSmallTask": "skip-linear-and-tell-user",
     "onAmbiguousTask": "ask-before-linear"
+  },
+  "taskSize": {
+    "trackWhen": [
+      "requires a plan",
+      "changes product/application behavior",
+      "fixes a bug",
+      "adds a feature",
+      "requires meaningful testing or review"
+    ],
+    "skipWhen": [
+      "commit only",
+      "push only",
+      "create worktree only",
+      "small text edit",
+      "formatting only",
+      "read-only explanation"
+    ]
   },
   "statuses": {
     "backlog": "Backlog",
@@ -52,7 +71,11 @@ Create this folder in each repository that uses `linear-workflow`:
 ```md
 # Linear Workflow
 
-Use Linear for planning and implementation work only when the task belongs to this repository/product. Skip Linear and tell the user when the task is for shared tooling, another repository, or an unrelated product.
+Use Linear for eligible planning and implementation work.
+
+Before touching Linear, confirm the request is inside this config's work scope and is large enough to track as a standalone issue.
+
+Skip Linear for unrelated scopes and tiny operational tasks such as commit-only, push-only, worktree-only, formatting-only, or small text edits.
 
 Lifecycle:
 

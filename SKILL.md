@@ -1,13 +1,13 @@
 ---
 name: linear-workflow
-description: Track software planning and implementation work in Linear. Use before planning or implementing fixes, features, refactors, behavior changes, or vague ideas that need discovery. Handles project config from .linear-workflow/, duplicate checks, issue creation/reuse, status transitions, progress comments, and final review handoff.
+description: Track eligible software planning and implementation work in Linear. Use before planning or implementing fixes, features, refactors, behavior changes, or vague ideas that need discovery. Handles per-repository config from .linear-workflow/, scope/task-size eligibility gates, duplicate checks, issue creation/reuse, status transitions, progress comments, and final review handoff.
 ---
 
 # Linear Workflow
 
-Use this skill before planning or implementing software work that should be represented in Linear.
+Use this skill before planning or implementing software work that may need to be represented in Linear. Loading the skill does not mean Linear must be touched; first run the eligibility gates below.
 
-This skill is reusable across projects. Keep project-specific Linear settings in the repository, not in this skill.
+This skill is reusable across repositories, products, and teams. Keep each repository's Linear configuration and work scope in `.linear-workflow/`, not in this skill.
 
 ## Trigger
 
@@ -19,17 +19,17 @@ Use this skill whenever the user asks to:
 - continue, revise, or complete previously planned implementation work;
 - capture an idea that needs discovery, research, clarification, or planning before implementation.
 
-Do not create a new issue for small read-only explanations, searches, or reviews unless the work becomes a plan or implementation task.
+Do not create a new issue for small read-only explanations, searches, or reviews unless the work becomes an eligible plan or implementation task.
 
-## Project Config
+## Repository/Workspace Config
 
-Read project config from:
+Read config from:
 
 1. `.linear-workflow/config.json` preferred
 2. `.linear-workflow/config.md` fallback
-3. `AGENTS.md` fallback if project config is missing
+3. `AGENTS.md` fallback if config is missing
 
-If no config exists, ask the user for the Linear team, project, and status names before creating issues.
+If no config exists, ask the user for the Linear team, Linear project if any, work scope, status names, and task-size policy before creating issues.
 
 Recommended `.linear-workflow/config.json`:
 
@@ -37,19 +37,40 @@ Recommended `.linear-workflow/config.json`:
 {
   "team": "Example Team",
   "project": "Example Project",
-  "projectScope": {
-    "description": "Short description of the product/repository this Linear project tracks.",
+  "workScope": {
+    "description": "Short description of the product, repository, workspace, or workstream this Linear config tracks.",
     "inScope": [
-      "Features, fixes, refactors, migrations, and plans for this product/repository"
+      "Features, fixes, refactors, migrations, and plans for this configured work scope"
     ],
     "outOfScope": [
-      "Shared agent skills, unrelated tooling, or work for a different repository/product"
+      "Shared agent skills, unrelated tooling, or work for a different repository/product/workstream"
     ]
   },
   "trackingPolicy": {
-    "projectRelevance": "required",
+    "scopeRelevance": "required",
+    "minimumTaskSize": "standalone-change-or-plan",
     "onUnrelatedTask": "skip-linear-and-tell-user",
+    "onSmallTask": "skip-linear-and-tell-user",
     "onAmbiguousTask": "ask-before-linear"
+  },
+  "taskSize": {
+    "trackWhen": [
+      "requires a plan",
+      "changes product/application behavior",
+      "fixes a bug",
+      "adds a feature",
+      "requires meaningful testing or review",
+      "touches API, database, automation, scheduling, sending, or user-facing UI"
+    ],
+    "skipWhen": [
+      "commit only",
+      "push only",
+      "create worktree only",
+      "small text edit",
+      "formatting only",
+      "read-only explanation",
+      "external/shared skill maintenance unless this config explicitly tracks that skill"
+    ]
   },
   "statuses": {
     "backlog": "Backlog",
@@ -70,30 +91,77 @@ Recommended `.linear-workflow/config.json`:
 }
 ```
 
-## Project Relevance Gate
+## Tracking Eligibility Gates
 
-Before any Linear search, creation, status update, or comment, decide whether the user's request belongs to the configured Linear project.
+Before any Linear search, creation, status update, or comment, run both gates:
 
-Use `.linear-workflow/config.json` fields `project`, `projectScope`, and `trackingPolicy` to decide. The configured Linear project is not a general agent-work bucket; it tracks only work for that product/repository.
+1. Scope relevance gate — does this request belong to the configured work scope?
+2. Task significance gate — is this request large/meaningful enough to track as a Linear issue?
 
-Pass the gate when the request clearly changes, plans, debugs, researches, or implements something for the current repository/product described by `projectScope`.
+The skill can be loaded only to decide that Linear should be skipped. Do not treat the configured Linear project as a general agent-work bucket.
 
-Fail the gate when the request is about:
+Use `.linear-workflow/config.json` fields `project`, `workScope` (or legacy `projectScope`), `trackingPolicy`, and `taskSize` to decide.
 
-- a shared or global agent skill;
-- Pi/agent configuration unrelated to this product;
-- another repository, package, service, client, or product;
+### Scope relevance gate
+
+Pass this gate when the request clearly changes, plans, debugs, researches, or implements something for the configured work scope. The scope may be a product, repository, package, shared skill, team workstream, or other explicitly configured area. It is not necessarily a product project.
+
+Fail this gate when the request is about:
+
+- a shared/global agent skill while the current config tracks an application/product;
+- an application/product while the current config tracks a shared skill;
+- Pi/agent configuration unrelated to the configured work scope;
+- another repository, package, service, client, product, or workstream;
 - Linear bookkeeping itself, unless the bookkeeping is for an in-scope issue;
-- general advice, read-only explanation, or research that does not create a project plan or implementation task.
+- general advice, read-only explanation, or research that does not create an in-scope plan or implementation task.
 
-If the task fails the gate:
+If this gate fails:
 
 1. Do not query Linear.
 2. Do not create or update a Linear issue.
-3. Tell the user briefly that the task does not appear related to the configured Linear project and Linear tracking was skipped.
-4. Offer to track it only if the user provides the correct Linear project/config or explicitly says it belongs to this project.
+3. Briefly tell the user that the task appears outside the configured work scope and Linear tracking was skipped.
+4. Offer to track it only if the user provides the correct Linear config or explicitly says this work belongs to the current scope.
 
-If relevance is ambiguous, ask one focused question before touching Linear. Default to not creating/updating Linear until the user confirms the task belongs in the configured project.
+Suggested message:
+
+```text
+I’m not using Linear for this because the task appears outside the configured work scope: <scope/project>. If this should be tracked, tell me which Linear config/project to use.
+```
+
+If relevance is ambiguous, ask one focused question before touching Linear. Default to not creating/updating Linear until the user confirms the task belongs in the configured scope.
+
+### Task significance gate
+
+Pass this gate when the request is meaningful enough to be a standalone Linear task, such as:
+
+- it requires a plan or discovery;
+- it changes product/application behavior;
+- it fixes a bug or adds a feature;
+- it touches API, database, automation, scheduling, sending, user-facing UI, deployment, or data migrations;
+- it requires meaningful testing, review, or rollout notes;
+- it is part of an already tracked issue and the Linear update is useful.
+
+Fail this gate for small operational/mechanical tasks, such as:
+
+- commit-only or push-only requests;
+- creating/checking out a worktree or branch;
+- tiny copy/text edits;
+- formatting-only or lint-only changes;
+- reading, searching, explaining, or summarizing without a resulting plan/implementation;
+- tool installation/update chores that do not affect the configured work scope;
+- renames or file moves that are not part of a larger tracked change.
+
+If this gate fails:
+
+1. Do not create a new issue.
+2. Do not update Linear unless there is already an active issue and a short comment would add useful context.
+3. Briefly tell the user Linear was skipped because the task is too small/operational to track as a standalone issue.
+
+Suggested message:
+
+```text
+I’m not creating a Linear issue for this because it is a small operational task, not a standalone feature/fix/plan.
+```
 
 ## Tool Preference
 
@@ -104,8 +172,8 @@ When the `subagent` tool is available to the parent agent, delegate Linear bookk
 Use a narrow subagent task that includes only:
 
 - the user request summary;
-- the repo Linear config (`team`, `project`, project scope, statuses, done policy);
-- the parent agent's explicit project relevance decision;
+- the repo Linear config (`team`, `project`, work scope, tracking policy, task size policy, statuses, done policy);
+- the parent agent's explicit eligibility decision: scope relevance and task significance;
 - the intended workflow action: search/reuse/create/update/comment/status transition;
 - the required title prefix rule: new issues start with `🤖 `;
 - the expected compact result shape: issue identifier, URL, status, whether it was created/reused/updated, and any blocker.
@@ -126,7 +194,7 @@ Example subagent shape:
 subagent({
   agent: "delegate",
   context: "fresh",
-  task: "Perform only Linear bookkeeping for this request. Read .linear-workflow/config.json if needed. Search for duplicates, create or reuse the issue, apply the configured status, and return only: identifier, URL, status, action taken, and blockers. Do not modify project files."
+  task: "Perform only Linear bookkeeping for this request after the parent has confirmed it passes the scope and task-size gates. Read .linear-workflow/config.json if needed. Search for duplicates, create or reuse the issue, apply the configured status, and return only: identifier, URL, status, action taken, and blockers. Do not modify project files."
 })
 ```
 
@@ -157,14 +225,15 @@ For markdown descriptions and comments, prefer files over inline shell arguments
 
 ## Required Workflow
 
-### 1. Load config and confirm project relevance
+### 1. Load config and run eligibility gates
 
 Read `.linear-workflow/config.json` and extract:
 
 - `team`
 - `project`
-- `projectScope`
+- `workScope` or legacy `projectScope`
 - `trackingPolicy`
+- `taskSize`
 - `statuses.backlog`
 - `statuses.planning`
 - `statuses.active`
@@ -172,9 +241,13 @@ Read `.linear-workflow/config.json` and extract:
 - `statuses.done`
 - `donePolicy`
 
-Run the Project Relevance Gate before any Linear API/CLI call. If the request is unrelated to the configured project, stop the Linear workflow and tell the user Linear tracking was skipped because the task does not appear to belong to this project's Linear board. If relevance is ambiguous, ask the user to confirm before touching Linear.
+Run the Tracking Eligibility Gates before any Linear API/CLI call, including status-list validation.
 
-Validate that required status names exist if the tool can list statuses. If a configured status is missing, pause and tell the user what to create.
+If the request is outside the configured work scope, stop the Linear workflow and tell the user Linear tracking was skipped because the task does not appear to belong to the configured scope. If relevance is ambiguous, ask the user to confirm before touching Linear.
+
+If the request is too small or operational to track as a standalone issue, stop the Linear workflow and tell the user Linear tracking was skipped because the task is below the configured tracking threshold. If an active issue is already known, add a comment only when useful.
+
+Only after both gates pass, validate that required status names exist if the tool can list statuses. If a configured status is missing, pause and tell the user what to create.
 
 ### 2. Search for duplicates
 
