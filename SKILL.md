@@ -58,6 +58,40 @@ Recommended `.linear-workflow/config.json`:
 
 ## Tool Preference
 
+### Context-preserving execution
+
+When the `subagent` tool is available to the parent agent, delegate Linear bookkeeping to a fresh-context subagent instead of performing it in the main conversation. This keeps duplicate searches, issue payload drafting, API/CLI output, and status/comment operations out of the parent context.
+
+Use a narrow subagent task that includes only:
+
+- the user request summary;
+- the repo Linear config (`team`, `project`, statuses, done policy);
+- the intended workflow action: search/reuse/create/update/comment/status transition;
+- the required title prefix rule: new issues start with `🤖 `;
+- the expected compact result shape: issue identifier, URL, status, whether it was created/reused/updated, and any blocker.
+
+Subagent execution rules:
+
+- Prefer `context: "fresh"` so the child does not inherit the full parent conversation.
+- Use the `delegate` agent or another available Linear-capable agent. If a project provides a specialized Linear agent, prefer it.
+- For initial issue search/create/reuse, wait for the subagent result before starting implementation so the parent can reference the issue.
+- For non-blocking progress comments, async subagents are acceptable if the parent does not need the result immediately.
+- The child must not make product, scope, architecture, or implementation decisions; it only performs Linear bookkeeping from the parent-provided summary.
+- If the child cannot access Linear MCP/CLI/auth, it must report the blocker. The parent then falls back to inline Linear tooling.
+- Do not use `pi -p` or spawn a separate Pi CLI process for this workflow.
+
+Example subagent shape:
+
+```typescript
+subagent({
+  agent: "delegate",
+  context: "fresh",
+  task: "Perform only Linear bookkeeping for this request. Read .linear-workflow/config.json if needed. Search for duplicates, create or reuse the issue, apply the configured status, and return only: identifier, URL, status, action taken, and blockers. Do not modify project files."
+})
+```
+
+### Linear tool preference inside the parent or child
+
 Use whichever Linear integration is available and authenticated:
 
 1. Prefer Linear MCP for common operations because it returns structured data and avoids shell escaping.
@@ -139,6 +173,8 @@ Choose status by request type:
 
 Issue title must be short and understandable.
 
+For every new issue created by this skill, prefix the title with the robot emoji and a space: `🤖 `. This applies to all creation paths, including Linear MCP and `schpet/linear-cli`. Do not add a second robot prefix if the proposed title already starts with `🤖 `. When searching for duplicates, use meaningful keywords from the title/request without relying on the emoji. When reusing an existing issue, do not rename it solely to add the robot prefix unless the user explicitly asks.
+
 Issue description must include:
 
 - user request summary;
@@ -182,7 +218,7 @@ npx @schpet/linear-cli issue create \
   --team "<team>" \
   --project "<project>" \
   --state "<planning status>" \
-  --title "<clear title>" \
+  --title "🤖 <clear title>" \
   --description-file /tmp/linear-description.md
 ```
 
@@ -193,7 +229,7 @@ npx @schpet/linear-cli issue create \
   --team "<team>" \
   --project "<project>" \
   --state "<active status>" \
-  --title "<clear title>" \
+  --title "🤖 <clear title>" \
   --description-file /tmp/linear-description.md
 ```
 
@@ -213,8 +249,12 @@ npx @schpet/linear-cli issue update <ISSUE_ID> --state "<status>"
 
 If Linear authentication is unavailable:
 
-1. Try the other configured tool path: MCP ↔ CLI.
-2. If neither works, pause and tell the user Linear tracking is blocked.
-3. Do not silently continue with implementation when tracking is required by project rules.
+1. If the Linear operation was delegated to a subagent, have the child report the blocker compactly and return control to the parent.
+2. Try the other configured tool path: MCP ↔ CLI.
+3. If the subagent path failed due tool/auth availability, retry inline in the parent with MCP/CLI before declaring tracking blocked.
+4. If neither MCP nor CLI works, pause and tell the user Linear tracking is blocked.
+5. Do not silently continue with implementation when tracking is required by project rules.
 
 If duplicate search fails due tooling/auth but Linear creation works, search with a different tool or narrower query before creating a new issue.
+
+Never use `pi -p` or spawn a separate Pi CLI process as a fallback for this skill. Use subagents when available, otherwise use inline Linear MCP/CLI.
