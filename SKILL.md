@@ -362,10 +362,23 @@ Backlog → Todo → In Progress → Review → Done
 Choose status by request type:
 
 - `backlog`: vague idea, needs discovery/research/clarification before a safe plan can be made.
-- `planning`: user asks to plan and a concrete plan can be produced now.
+- `planning`: user asks to plan and a concrete plan can be produced now, or a previously Backlog issue now has a concrete plan and is waiting for user approval.
 - `active`: user asks to implement now or you are starting implementation.
 - `review`: implementation is complete and ready for user validation.
 - `done`: only after explicit user acceptance or close request.
+
+Status freshness rule:
+
+Keep the Linear issue status current throughout the work. At every meaningful phase transition, update the issue status before claiming that phase is complete or moving on to the next phase.
+
+Required transitions:
+
+- `statuses.backlog` → `statuses.planning` once a concrete plan, design, or spec exists and is waiting for user approval.
+- `statuses.planning` → `statuses.active` when implementation starts.
+- `statuses.active` → `statuses.review` when implementation is complete and ready for user validation.
+- `statuses.review` → `statuses.done` only after explicit user acceptance or an explicit close request.
+
+Do not leave issues in stale statuses. If a status update fails, report the blocker and do not imply Linear is up to date. If work becomes blocked without a status transition, keep the current status but add a blocker comment.
 
 ### 4. Create or update issue
 
@@ -383,17 +396,30 @@ Issue description must include:
 
 If reusing an issue, update status if needed and add a comment with the new request context.
 
-### 5. Add progress comments
+### 5. Promote plan-ready Backlog issues to planning
+
+When a concrete plan, design, or implementation spec is complete for an issue that started in `statuses.backlog`, move the issue to `statuses.planning` (usually Todo) before asking the user to approve the plan. Do not leave plan-ready work in Backlog while it waits for approval.
+
+This applies whether the plan was written inline, saved to a file, or produced by a planning subagent. Add a concise Linear comment that includes:
+
+- plan summary or plan file path/link;
+- that the plan is ready for user approval;
+- any known blockers or decisions still needed before implementation.
+
+Do not move the issue to `statuses.active` until implementation actually starts. If the status update or comment fails, report the blocker instead of claiming the planning handoff is complete.
+
+### 6. Add progress comments
 
 Add a concise Linear comment when moving between meaningful stages, especially:
 
 - planning created;
+- planning completed and waiting for approval;
 - implementation started;
 - significant milestone completed;
 - blocker discovered;
 - implementation ready for review.
 
-### 6. Final review handoff
+### 7. Final review handoff
 
 When implementation is complete:
 
