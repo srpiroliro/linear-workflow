@@ -245,6 +245,7 @@ Use a narrow subagent task that includes only:
 - the parent agent's explicit eligibility decision: scope relevance and task significance;
 - the intended workflow action: search/reuse/create/update/comment/status transition;
 - the required title prefix rule: new issues start with `🤖 `;
+- the title naming policy: title the feature/fix/outcome directly, not the workflow phase; avoid names like `Plan for <feature>`;
 - the expected compact result shape: issue identifier, URL, status, whether it was created/reused/updated, and any blocker.
 
 Subagent execution rules:
@@ -383,6 +384,13 @@ Do not leave issues in stale statuses. If a status update fails, report the bloc
 ### 4. Create or update issue
 
 Issue title must be short and understandable.
+
+Title naming policy:
+
+- Name issues for the feature, fix, behavior, or outcome itself, not for the workflow phase.
+- Do not title issues with phase wrappers such as `Plan for <feature>`, `Create a plan for <feature>`, `Implementation of <feature>`, `Validate <feature>`, or similar wording.
+- Planning, implementation, and validation are expected workflow stages for most tracked work; represent the current phase with Linear status and comments, not the issue title.
+- If the user asks to create a plan for image viewing, the issue title should be `🤖 Image viewing` or `🤖 View images`, not `🤖 Plan for image viewing`.
 
 For every new issue created by this skill, prefix the title with the robot emoji and a space: `🤖 `. This applies to all creation paths, including Linear MCP and `schpet/linear-cli`. Do not add a second robot prefix if the proposed title already starts with `🤖 `. When searching for duplicates, use meaningful keywords from the title/request without relying on the emoji. When reusing an existing issue, do not rename it solely to add the robot prefix unless the user explicitly asks.
 
