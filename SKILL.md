@@ -1,6 +1,6 @@
 ---
 name: linear-workflow
-description: Track eligible software planning and implementation work in Linear. Use before planning or implementing fixes, features, refactors, behavior changes, or vague ideas that need discovery. Handles per-repository config from .linear-workflow/, scope/task-size eligibility gates, duplicate checks, issue creation/reuse, status transitions, progress comments, and final review handoff.
+description: Track eligible software planning and implementation work in Linear. Use before planning or implementing fixes, features, refactors, behavior changes, vague ideas that need discovery, or setting up Linear workflow in a new repository. Handles per-repository config from .linear-workflow/, new-repo bootstrap, scope/task-size eligibility gates, duplicate checks, issue creation/reuse, status transitions, progress comments, and final review handoff.
 ---
 
 # Linear Workflow
@@ -27,9 +27,11 @@ Read config from:
 
 1. `.linear-workflow/config.json` preferred
 2. `.linear-workflow/config.md` fallback
-3. `AGENTS.md` fallback if config is missing
+3. Legacy `AGENTS.md` fallback only when it contains explicit Linear team/project/status config
 
-If no config exists, ask the user for the Linear team, Linear project if any, work scope, status names, and task-size policy before creating issues.
+If no `.linear-workflow/config.json` exists, run the New Repository Bootstrap below. Do not create/search/update Linear issues for project work until the repository has config or the user explicitly chooses a config for this session.
+
+The skill owns the reusable workflow rules. Repository files should only hold local configuration and, optionally, a short `AGENTS.md` pointer that tells agents to use this skill.
 
 Recommended `.linear-workflow/config.json`:
 
@@ -90,6 +92,73 @@ Recommended `.linear-workflow/config.json`:
   "toolPreference": ["linear-mcp", "schpet-linear-cli"]
 }
 ```
+
+Set `project` to `null` when issues should be tracked at team level without a Linear project.
+
+## New Repository Bootstrap
+
+Run this bootstrap when `.linear-workflow/config.json` is missing or clearly incomplete.
+
+### Bootstrap principles
+
+- Do not touch Linear for issue tracking until config exists or the user explicitly selects a session config.
+- Do not automatically create a Linear project.
+- Do not assume every repository needs its own Linear project.
+- The agent may create config files, but only after user confirmation.
+- Keep `AGENTS.md` optional and minimal; do not duplicate this skill's workflow rules there.
+
+### Bootstrap flow
+
+1. Inspect the repository enough to suggest a work scope: repo name, README/package metadata, top-level directories, and existing agent instructions.
+2. Tell the user no `.linear-workflow/config.json` exists and ask whether to configure Linear workflow for this repository.
+3. Offer exactly these setup choices:
+   - Use an existing Linear project.
+   - Create a new Linear project.
+   - Track issues at team level without a Linear project (`project: null`).
+   - Skip Linear workflow for this repository.
+4. If the user chooses an existing project:
+   - list/search Linear teams and projects when tooling is available;
+   - ask the user to choose the matching team/project when ambiguous;
+   - write `.linear-workflow/config.json` and `.linear-workflow/workflow.md` after confirmation.
+5. If the user chooses a new project:
+   - ask for the Linear team and project name/description;
+   - create the Linear project only after explicit confirmation;
+   - if tooling cannot create projects, ask the user to create it manually and then continue config;
+   - write `.linear-workflow/config.json` and `.linear-workflow/workflow.md` after the project exists or the user confirms the intended project name.
+6. If the user chooses team-level tracking:
+   - set `project` to `null`;
+   - search/create issues by team only;
+   - write `.linear-workflow/config.json` and `.linear-workflow/workflow.md` after confirmation.
+7. If the user chooses to skip:
+   - do not create config;
+   - do not create Linear issues;
+   - continue the user's task without Linear tracking.
+
+### Files created during bootstrap
+
+Create these files after confirmation:
+
+```text
+.linear-workflow/
+  config.json
+  workflow.md
+```
+
+Optionally create or update `AGENTS.md` only when the user wants persistent agent instructions or the repository already uses `AGENTS.md`. The content should be a short activation pointer, for example:
+
+```md
+# Project Agent Rules
+
+## Linear workflow
+
+For eligible planning or implementation work in this repository, use the `linear-workflow` skill. Repository-specific Linear config lives in `.linear-workflow/`.
+```
+
+Do not paste duplicate lifecycle, gate, duplicate-search, or handoff rules into `AGENTS.md`; those belong in this skill.
+
+### Bootstrap tracking
+
+Do not create a Linear issue merely to track the bootstrap unless the user explicitly asks. Once config exists, future eligible project work can be tracked normally.
 
 ## Tracking Eligibility Gates
 
@@ -225,12 +294,14 @@ For markdown descriptions and comments, prefer files over inline shell arguments
 
 ## Required Workflow
 
-### 1. Load config and run eligibility gates
+### 1. Load config, bootstrap if needed, and run eligibility gates
 
-Read `.linear-workflow/config.json` and extract:
+If `.linear-workflow/config.json` is missing or incomplete, run the New Repository Bootstrap before any Linear API/CLI calls for issue tracking. If the user declines setup, stop the Linear workflow for this repository and continue the task without Linear tracking.
+
+When config exists, read `.linear-workflow/config.json` and extract:
 
 - `team`
-- `project`
+- `project` (string project name/id, or `null` for team-level tracking)
 - `workScope` or legacy `projectScope`
 - `trackingPolicy`
 - `taskSize`
@@ -251,7 +322,7 @@ Only after both gates pass, validate that required status names exist if the too
 
 ### 2. Search for duplicates
 
-Before creating an issue, search existing issues in the configured team/project using concise keywords from the user request.
+Before creating an issue, search existing issues in the configured team and configured project when `project` is not `null`. If `project` is `null`, search by team only. Use concise keywords from the user request.
 
 Linear MCP pattern:
 
@@ -262,7 +333,17 @@ CLI pattern:
 ```bash
 npx @schpet/linear-cli issue query \
   --team "<team>" \
-  --project "<project>" \
+  --project "<project-if-configured>" \
+  --search "<keywords>" \
+  --all-states \
+  --json
+```
+
+Omit `--project` when `project` is `null`:
+
+```bash
+npx @schpet/linear-cli issue query \
+  --team "<team>" \
   --search "<keywords>" \
   --all-states \
   --json
@@ -328,7 +409,7 @@ Do not move to `statuses.done` unless the user explicitly accepts the work or as
 
 ## CLI Examples
 
-Create a planning issue:
+Create a planning issue when a project is configured:
 
 ```bash
 npx @schpet/linear-cli issue create \
@@ -339,7 +420,17 @@ npx @schpet/linear-cli issue create \
   --description-file /tmp/linear-description.md
 ```
 
-Create an implementation issue:
+Create a planning issue for team-level tracking when `project` is `null`:
+
+```bash
+npx @schpet/linear-cli issue create \
+  --team "<team>" \
+  --state "<planning status>" \
+  --title "🤖 <clear title>" \
+  --description-file /tmp/linear-description.md
+```
+
+Create an implementation issue when a project is configured:
 
 ```bash
 npx @schpet/linear-cli issue create \
@@ -349,6 +440,8 @@ npx @schpet/linear-cli issue create \
   --title "🤖 <clear title>" \
   --description-file /tmp/linear-description.md
 ```
+
+Omit `--project` for implementation issues when `project` is `null`.
 
 Add a comment:
 

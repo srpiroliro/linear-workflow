@@ -1,6 +1,6 @@
 # Linear Workflow Config Template
 
-Create this folder in each repository, product workspace, shared skill repo, or workstream that uses `linear-workflow`:
+Create this folder in each repository, product workspace, shared skill repo, or workstream that uses `linear-workflow`. The agent should create it during bootstrap only after the user confirms the Linear team/project/work-scope choices:
 
 ```text
 .linear-workflow/
@@ -65,6 +65,22 @@ Create this folder in each repository, product workspace, shared skill repo, or 
   "toolPreference": ["linear-mcp", "schpet-linear-cli"]
 }
 ```
+
+Set `project` to `null` when the repository should track issues at team level without a Linear project.
+
+## Optional minimal `AGENTS.md`
+
+Create or update `AGENTS.md` only when the user wants persistent agent instructions or the repository already uses that file. Keep it short:
+
+```md
+# Project Agent Rules
+
+## Linear workflow
+
+For eligible planning or implementation work in this repository, use the `linear-workflow` skill. Repository-specific Linear config lives in `.linear-workflow/`.
+```
+
+Do not duplicate the skill's full workflow rules in `AGENTS.md`.
 
 ## `.linear-workflow/workflow.md`
 
