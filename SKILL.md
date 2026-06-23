@@ -37,6 +37,20 @@ Recommended `.linear-workflow/config.json`:
 {
   "team": "Example Team",
   "project": "Example Project",
+  "projectScope": {
+    "description": "Short description of the product/repository this Linear project tracks.",
+    "inScope": [
+      "Features, fixes, refactors, migrations, and plans for this product/repository"
+    ],
+    "outOfScope": [
+      "Shared agent skills, unrelated tooling, or work for a different repository/product"
+    ]
+  },
+  "trackingPolicy": {
+    "projectRelevance": "required",
+    "onUnrelatedTask": "skip-linear-and-tell-user",
+    "onAmbiguousTask": "ask-before-linear"
+  },
   "statuses": {
     "backlog": "Backlog",
     "planning": "Todo",
@@ -56,6 +70,31 @@ Recommended `.linear-workflow/config.json`:
 }
 ```
 
+## Project Relevance Gate
+
+Before any Linear search, creation, status update, or comment, decide whether the user's request belongs to the configured Linear project.
+
+Use `.linear-workflow/config.json` fields `project`, `projectScope`, and `trackingPolicy` to decide. The configured Linear project is not a general agent-work bucket; it tracks only work for that product/repository.
+
+Pass the gate when the request clearly changes, plans, debugs, researches, or implements something for the current repository/product described by `projectScope`.
+
+Fail the gate when the request is about:
+
+- a shared or global agent skill;
+- Pi/agent configuration unrelated to this product;
+- another repository, package, service, client, or product;
+- Linear bookkeeping itself, unless the bookkeeping is for an in-scope issue;
+- general advice, read-only explanation, or research that does not create a project plan or implementation task.
+
+If the task fails the gate:
+
+1. Do not query Linear.
+2. Do not create or update a Linear issue.
+3. Tell the user briefly that the task does not appear related to the configured Linear project and Linear tracking was skipped.
+4. Offer to track it only if the user provides the correct Linear project/config or explicitly says it belongs to this project.
+
+If relevance is ambiguous, ask one focused question before touching Linear. Default to not creating/updating Linear until the user confirms the task belongs in the configured project.
+
 ## Tool Preference
 
 ### Context-preserving execution
@@ -65,7 +104,8 @@ When the `subagent` tool is available to the parent agent, delegate Linear bookk
 Use a narrow subagent task that includes only:
 
 - the user request summary;
-- the repo Linear config (`team`, `project`, statuses, done policy);
+- the repo Linear config (`team`, `project`, project scope, statuses, done policy);
+- the parent agent's explicit project relevance decision;
 - the intended workflow action: search/reuse/create/update/comment/status transition;
 - the required title prefix rule: new issues start with `🤖 `;
 - the expected compact result shape: issue identifier, URL, status, whether it was created/reused/updated, and any blocker.
@@ -117,18 +157,22 @@ For markdown descriptions and comments, prefer files over inline shell arguments
 
 ## Required Workflow
 
-### 1. Load config
+### 1. Load config and confirm project relevance
 
 Read `.linear-workflow/config.json` and extract:
 
 - `team`
 - `project`
+- `projectScope`
+- `trackingPolicy`
 - `statuses.backlog`
 - `statuses.planning`
 - `statuses.active`
 - `statuses.review`
 - `statuses.done`
 - `donePolicy`
+
+Run the Project Relevance Gate before any Linear API/CLI call. If the request is unrelated to the configured project, stop the Linear workflow and tell the user Linear tracking was skipped because the task does not appear to belong to this project's Linear board. If relevance is ambiguous, ask the user to confirm before touching Linear.
 
 Validate that required status names exist if the tool can list statuses. If a configured status is missing, pause and tell the user what to create.
 

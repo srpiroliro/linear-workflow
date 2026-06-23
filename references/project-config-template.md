@@ -14,6 +14,20 @@ Create this folder in each repository that uses `linear-workflow`:
 {
   "team": "Example Team",
   "project": "Example Project",
+  "projectScope": {
+    "description": "Short description of the product/repository this Linear project tracks.",
+    "inScope": [
+      "Features, fixes, refactors, migrations, and plans for this product/repository"
+    ],
+    "outOfScope": [
+      "Shared agent skills, unrelated tooling, or work for a different repository/product"
+    ]
+  },
+  "trackingPolicy": {
+    "projectRelevance": "required",
+    "onUnrelatedTask": "skip-linear-and-tell-user",
+    "onAmbiguousTask": "ask-before-linear"
+  },
   "statuses": {
     "backlog": "Backlog",
     "planning": "Todo",
@@ -38,7 +52,7 @@ Create this folder in each repository that uses `linear-workflow`:
 ```md
 # Linear Workflow
 
-Use Linear for all planning and implementation work.
+Use Linear for planning and implementation work only when the task belongs to this repository/product. Skip Linear and tell the user when the task is for shared tooling, another repository, or an unrelated product.
 
 Lifecycle:
 
